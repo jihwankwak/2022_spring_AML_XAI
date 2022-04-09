@@ -19,6 +19,7 @@ class Trainer(trainer.GenericTrainer):
         super().__init__(model, args, optimizer, evaluator, taskcla)
         
         self.lamb=args.lamb
+        self.loss = nn.CrossEntropyLoss()
         
 
     def train(self, train_loader, test_loader, t, device = None):
@@ -29,7 +30,7 @@ class Trainer(trainer.GenericTrainer):
         # Do not update self.t
         if t>0: # update fisher before start training new task
             self.update_frozen_model()
-            self.update_fisher()
+            # self.update_fisher()
         
         # Now, you can update self.t
         self.t = t
@@ -69,12 +70,10 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################
+
+        loss = self.loss(output, targets)
         
-        
-        
-        # Write youre code here
-        
-        
-        
+        return loss
+    
         #######################################################################################
         

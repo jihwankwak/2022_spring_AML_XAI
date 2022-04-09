@@ -33,7 +33,7 @@ def main():
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = True
-    device = torch.device("cpu")
+    device = torch.device("cuda")
     # torch.backends.cudnn.benchmark = False
 
     if not os.path.isdir('dat'):
@@ -99,14 +99,17 @@ def main():
     acc = np.zeros((len(task_info), len(task_info)), dtype=np.float32)
     lss = np.zeros((len(task_info), len(task_info)), dtype=np.float32)
     for t, ncla in task_info:
+
         print("tasknum:", t)
         # Add new classes to the train, and test iterator
 
         train_loader = train_dataset_loaders[t]
         test_loader = test_dataset_loaders[t]
 
-        myTrainer.train(train_loader, test_loader, t, device)
+        # myTrainer.model, flag = utils.load_model(t, args, myTrainer.model)
 
+        # if flag == False:
+        myTrainer.train(train_loader, test_loader, t, device)        
 
         for u in range(t+1):
 

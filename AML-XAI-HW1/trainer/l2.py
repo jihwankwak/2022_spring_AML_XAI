@@ -19,6 +19,9 @@ class Trainer(trainer.GenericTrainer):
         super().__init__(model, args, optimizer, evaluator, taskcla)
         
         self.lamb=args.lamb
+        self.loss = nn.CrossEntropyLoss()
+        # self.fisher = torch.zeros(sum(p.numel() for p in model.parameters()))
+        # print(self.fisher)
         
 
     def train(self, train_loader, test_loader, t, device = None):
@@ -29,7 +32,7 @@ class Trainer(trainer.GenericTrainer):
         # Do not update self.t
         if t>0: # update fisher before starting training new task
             self.update_frozen_model()
-            self.update_fisher()
+            # self.update_fisher()
         
         # Now, you can update self.t
         self.t = t
@@ -70,12 +73,17 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################
-        
-        
-        
-        # Write youre code here
-        
-        
-        
+        loss = self.loss(output, targets) + self.lamb/2 * self.fisher_loss()
+        return loss
         #######################################################################################
         
+    def fisher_loss(self):
+
+        loss = 0
+
+        for (n1, prev_model), (n2, cur_model) in zip(self.model_fixed.named_parameters(), self.model.named_parameters()):
+            if cur_model.requires_grad == True:
+                weight = (prev_model.data-cur_model.data).flatten()
+                # print(weight.shape)
+                loss += torch.sqrt(torch.matmul(weight, weight))
+        return loss

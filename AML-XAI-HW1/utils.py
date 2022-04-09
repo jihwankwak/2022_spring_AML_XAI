@@ -35,4 +35,3 @@ def print_optimizer_config(optim):
                 print(n+':',opt[n],end=', ')
         print()
     return
-
