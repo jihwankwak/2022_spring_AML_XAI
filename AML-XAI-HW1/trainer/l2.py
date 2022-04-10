@@ -39,7 +39,7 @@ class Trainer(trainer.GenericTrainer):
         
         self.train_iterator = torch.utils.data.DataLoader(train_loader, batch_size=self.args.batch_size, shuffle=True)
         self.test_iterator = torch.utils.data.DataLoader(test_loader, 100, shuffle=False)
-        self.fisher_iterator = torch.utils.data.DataLoader(train_loader, batch_size=20, shuffle=True)
+        # self.fisher_iterator = torch.utils.data.DataLoader(train_loader, batch_size=20, shuffle=True)
         
         
         for epoch in range(self.args.nepochs):
@@ -88,7 +88,7 @@ class Trainer(trainer.GenericTrainer):
 
         for (n1, prev_model), (n2, cur_model) in zip(self.model_fixed.named_parameters(), self.model.named_parameters()):
             if cur_model.requires_grad == True:
-                weight = (prev_model.data-cur_model.data).flatten()
+                weight = (prev_model-cur_model).flatten()
                 # print(weight.shape)
                 if 'last' not in n2:
                     # print(n2)

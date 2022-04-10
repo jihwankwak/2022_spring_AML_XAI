@@ -19,9 +19,7 @@ class Trainer(trainer.GenericTrainer):
         super().__init__(model, args, optimizer, evaluator, task_info)
         
         self.lamb=args.lamb
-        self.loss = nn.CrossEntropyLoss()
-        self.fisher = {}
-        
+        self.loss = nn.CrossEntropyLoss()       
 
     def train(self, train_loader, test_loader, t, device = None):
         
@@ -76,6 +74,7 @@ class Trainer(trainer.GenericTrainer):
         #######################################################################################
         if self.t > 0:
             loss = self.loss(output, targets) + self.lamb/2 * self.fisher_loss()
+            # print('loss', self.loss(output, targets), self.fisher_loss())
         else:
             loss = self.loss(output, targets)
 
@@ -90,7 +89,7 @@ class Trainer(trainer.GenericTrainer):
         for (n1, prev_model), (n2, cur_model) in zip(self.model_fixed.named_parameters(), self.model.named_parameters()):
             if cur_model.requires_grad == True:
 
-                weight = (prev_model.data-cur_model.data).flatten()
+                weight = (prev_model-cur_model).flatten()
 
                 if 'last' not in n2:
                     # print(self.fisher[n2].shape)
@@ -135,15 +134,15 @@ class Trainer(trainer.GenericTrainer):
             for name, param in self.model.named_parameters():
                 if param.grad is not None:
                     fisher[name] += ((param.grad)**2).flatten() * batch_size
-                    print(fisher[name][0])
+                    # print(fisher[name][0])
                     # if name == 'conv1.weight':
                     #     print('fisher', fisher[name])
         # print(batch_count)/
         # print('before', fisher)
         with torch.no_grad():
             for name, value in fisher.items():
-                print(name)
-                print(value.shape)
+                # print(name)
+                # print(value.shape)
                 fisher[name] = value/batch_count
                 # if name == 'conv1.weight':
                 #         print('fisher final', fisher[name])
@@ -164,13 +163,18 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################        
-        if self.t == 1:
-            for name, param in self.model_fixed.named_parameters():
-                self.fisher[name]=0*param.flatten()
 
-        new_fisher=self.compute_diag_fisher()
-        
-        for name, param in self.model.named_parameters():
-            self.fisher[name]=(new_fisher[name]+self.fisher[name]*(self.t-1))/(self.t)
+        # init
+        # for name, param in self.model.named_parameters():
+        #     if param.requires_grad == True:
+        #         self.fisher[name] = torch.zeros(param.flatten().shape) 
+        if self.t == 1:
+            self.fisher = self.compute_diag_fisher()
+        elif self.t > 1:
+            fisher_temp = self.fisher
+            self.fisher = self.compute_diag_fisher()
+            
+            for name, param in self.model.named_parameters():
+                self.fisher[name]=(self.fisher[name]+fisher_temp[name]*(self.t-1))/(self.t)
         
         #######################################################################################
