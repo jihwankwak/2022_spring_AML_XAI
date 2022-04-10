@@ -73,7 +73,12 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################
-        loss = self.loss(output, targets) + self.lamb/2 * self.fisher_loss()
+        if self.t > 0 :
+            loss = self.loss(output, targets) + self.lamb/2 * self.fisher_loss()
+            print('loss', self.loss(output, targets), self.fisher_loss())
+        else:
+            loss = self.loss(output, targets)
+        
         return loss
         #######################################################################################
         
@@ -85,5 +90,10 @@ class Trainer(trainer.GenericTrainer):
             if cur_model.requires_grad == True:
                 weight = (prev_model.data-cur_model.data).flatten()
                 # print(weight.shape)
-                loss += torch.sqrt(torch.matmul(weight, weight))
+                if 'last' not in n2:
+                    # print(n2)
+                    loss += torch.matmul(weight, weight)
+
+        # print(ss)
+                
         return loss

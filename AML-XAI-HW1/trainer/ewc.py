@@ -19,6 +19,8 @@ class Trainer(trainer.GenericTrainer):
         super().__init__(model, args, optimizer, evaluator, task_info)
         
         self.lamb=args.lamb
+        self.loss = nn.CrossEntropyLoss()
+        self.fisher = {}
         
 
     def train(self, train_loader, test_loader, t, device = None):
@@ -27,12 +29,14 @@ class Trainer(trainer.GenericTrainer):
         lr = self.args.lr
         self.setup_training(lr)
         # Do not update self.t
+
+        self.t = t
+
         if t>0: # update fisher before starting training new task
             self.update_frozen_model()
             self.update_fisher()
         
         # Now, you can update self.t
-        self.t = t
         
         self.train_iterator = torch.utils.data.DataLoader(train_loader, batch_size=self.args.batch_size, shuffle=True)
         self.test_iterator = torch.utils.data.DataLoader(test_loader, 100, shuffle=False)
@@ -70,15 +74,32 @@ class Trainer(trainer.GenericTrainer):
         """
         
         #######################################################################################
-        
-        
-        
-        # Write youre code here
-        
-        
+        if self.t > 0:
+            loss = self.loss(output, targets) + self.lamb/2 * self.fisher_loss()
+        else:
+            loss = self.loss(output, targets)
+
+        return loss
         
         #######################################################################################
     
+    def fisher_loss(self):
+
+        loss = 0
+
+        for (n1, prev_model), (n2, cur_model) in zip(self.model_fixed.named_parameters(), self.model.named_parameters()):
+            if cur_model.requires_grad == True:
+
+                weight = (prev_model.data-cur_model.data).flatten()
+
+                if 'last' not in n2:
+                    # print(self.fisher[n2].shape)
+                    # print(weight.shape)
+                    # print(ss)
+                    loss += torch.sum(weight.pow(2)*self.fisher[n2])
+
+        return loss
+
     def compute_diag_fisher(self):
         """
         Arguments: None. Just use global variables (self.model, self.criterion, ...)
@@ -86,15 +107,51 @@ class Trainer(trainer.GenericTrainer):
         
         This function will be used in the function 'update_fisher'
         """
+
+
+        fisher = {}
+        criterion = nn.CrossEntropyLoss()
         
-        
-        #######################################################################################
-        
-        
-        
-        # Write youre code here
-        
-        
+        # fisher init
+        for name,param in self.model_fixed.named_parameters():
+            fisher[name]=0*param.flatten()
+
+        self.model.train()
+        batch_count = 0
+
+        for samples in tqdm(self.fisher_iterator):
+            data, target = samples
+            data, target = data.to('cuda'), target.to('cuda')
+            batch_size = data.shape[0]
+
+            self.model.zero_grad()
+
+            output = self.model.forward(data)[self.t]
+            loss_CE = criterion(output,target)
+            loss_CE.backward()
+            
+            batch_count += batch_size
+
+            for name, param in self.model.named_parameters():
+                if param.grad is not None:
+                    fisher[name] += ((param.grad)**2).flatten() * batch_size
+                    print(fisher[name][0])
+                    # if name == 'conv1.weight':
+                    #     print('fisher', fisher[name])
+        # print(batch_count)/
+        # print('before', fisher)
+        with torch.no_grad():
+            for name, value in fisher.items():
+                print(name)
+                print(value.shape)
+                fisher[name] = value/batch_count
+                # if name == 'conv1.weight':
+                #         print('fisher final', fisher[name])
+
+        # print('after', fisher)
+        # print(ss)/
+
+        return fisher
         
         #######################################################################################        
     
@@ -106,12 +163,14 @@ class Trainer(trainer.GenericTrainer):
         Use 'compute_diag_fisher' to compute the fisher matrix
         """
         
-        #######################################################################################
+        #######################################################################################        
+        if self.t == 1:
+            for name, param in self.model_fixed.named_parameters():
+                self.fisher[name]=0*param.flatten()
+
+        new_fisher=self.compute_diag_fisher()
         
-        
-        
-        # Write youre code here
-        
-        
+        for name, param in self.model.named_parameters():
+            self.fisher[name]=(new_fisher[name]+self.fisher[name]*(self.t-1))/(self.t)
         
         #######################################################################################
