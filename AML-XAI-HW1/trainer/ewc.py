@@ -133,7 +133,7 @@ class Trainer(trainer.GenericTrainer):
 
             for name, param in self.model.named_parameters():
                 if param.grad is not None:
-                    fisher[name] += ((param.grad)**2).flatten() * batch_size
+                    fisher[name] += ((param.grad)**2).flatten()
                     # print(fisher[name][0])
                     # if name == 'conv1.weight':
                     #     print('fisher', fisher[name])
@@ -143,7 +143,7 @@ class Trainer(trainer.GenericTrainer):
             for name, value in fisher.items():
                 # print(name)
                 # print(value.shape)
-                fisher[name] = value/batch_count
+                fisher[name] = value/len(self.fisher_iterator)
                 # if name == 'conv1.weight':
                 #         print('fisher final', fisher[name])
 
