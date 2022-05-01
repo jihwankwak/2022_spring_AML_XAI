@@ -57,6 +57,8 @@ class GenericTrainer:
             accs = self._train_epoch(x_spt, y_spt, x_qry, y_qry)
             eval_flag = False
 
+            # print(x_spt.shape, y_spt.shape, x_qry.shape, y_qry.shape)
+
             self.result['training acc'].append(accs)
             
             if step % 50 == 0:

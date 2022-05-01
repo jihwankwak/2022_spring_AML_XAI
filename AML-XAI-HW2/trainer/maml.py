@@ -52,11 +52,13 @@ class Trainer(trainer.GenericTrainer):
         # results[0]: results for pre-update model
         # results[1:]: results for the adapted model at each inner loop step
         results = [0 for _ in range(self.inner_step + 1)]
+        losses = [0 for _ in range(self.inner_step + 1)]
         
         ##########################################################################################
 
+        # print(x_spt.shape, y_spt.shape, x_qry.shape, y_qry.shape)
         b, setsz = x_spt.shape[0], x_spt.shape[1]
-        querysz = y_spt.shape[1]
+        querysz = x_qry.shape[1]
         
         for meta_idx in range(b):
             
@@ -74,8 +76,12 @@ class Trainer(trainer.GenericTrainer):
                 if self.args.dataset == 'sine':
                     results[0] += loss
                 elif self.args.dataset == 'omniglot':
+                    losses[0] += loss
                     pred = F.softmax(logit, dim=1).argmax(dim=1)
-                    correct = torch.eq(pred_q, y_qry[meta_idx]).sum().item()
+                    correct = torch.eq(pred, y_qry[meta_idx]).sum().item()
+                    # print(pred.shape)
+                    # print(correct, querysz)
+                    # print(ss)
                     results[0] += correct / querysz
             
             with torch.no_grad():
@@ -85,8 +91,9 @@ class Trainer(trainer.GenericTrainer):
                 if self.args.dataset == 'sine':
                     results[1] += loss
                 elif self.args.dataset == 'omniglot':
+                    losses[1] += loss
                     pred = F.softmax(logit, dim=1).argmax(dim=1)
-                    correct = torch.eq(pred_q, y_qry[meta_idx]).sum().item()
+                    correct = torch.eq(pred, y_qry[meta_idx]).sum().item()
                     results[1] += correct / querysz        
             
             for k in range(2, self.inner_step+1):
@@ -103,19 +110,28 @@ class Trainer(trainer.GenericTrainer):
                 if self.args.dataset == 'sine':
                     results[k] += loss_qry
                 elif self.args.dataset == 'omniglot':
+                    losses[k] += loss_qry
                     pred = F.softmax(logit_qry, dim=1).argmax(dim=1)
-                    correct = torch.eq(pred_q, y_qry[meta_idx]).sum().item()
+                    correct = torch.eq(pred, y_qry[meta_idx]).sum().item()
                     results[k] += correct / querysz
             
         # if self.args.trainer == 'maml':
 
-        loss_final = results[-1] / b
-                    
-        results = [ i.cpu().detach().numpy() for i in results]
-        results = np.array(results) / b
-
         self.meta_optim.zero_grad()
-        loss_final.backward()
+                    
+        if self.args.dataset == 'sine':
+
+            loss_final = results[-1] / b
+            loss_final.backward()
+
+            results = [ i.cpu().detach().numpy() for i in results]
+
+        elif self.args.dataset == 'omniglot':
+
+            loss_final = losses[-1] / b
+            loss_final.backward()
+
+        results = np.array(results) / b
 
         self.meta_optim.step()
         
@@ -169,7 +185,7 @@ class Trainer(trainer.GenericTrainer):
         net = deepcopy(self.net)
 
         setsz = x_spt.shape[0]
-        querysz = y_spt.shape[0]
+        querysz = x_qry.shape[0]
             
         # first loop    
         logit = net(x_spt, vars=None)
@@ -186,7 +202,7 @@ class Trainer(trainer.GenericTrainer):
                 results[0] += loss
             elif self.args.dataset == 'omniglot':
                 pred = F.softmax(logit, dim=1).argmax(dim=1)
-                correct = torch.eq(pred_q, y_qry).sum().item()
+                correct = torch.eq(pred, y_qry).sum().item()
                 results[0] += correct / querysz
             
         with torch.no_grad():
@@ -197,7 +213,7 @@ class Trainer(trainer.GenericTrainer):
                 results[1] += loss
             elif self.args.dataset == 'omniglot':
                 pred = F.softmax(logit, dim=1).argmax(dim=1)
-                correct = torch.eq(pred_q, y_qry).sum().item()
+                correct = torch.eq(pred, y_qry).sum().item()
                 results[1] += correct / querysz      
 
         for k in range(2, self.inner_step+1):
@@ -215,13 +231,13 @@ class Trainer(trainer.GenericTrainer):
                 results[k] += loss_qry
             elif self.args.dataset == 'omniglot':
                 pred = F.softmax(logit_qry, dim=1).argmax(dim=1)
-                correct = torch.eq(pred_q, y_qry).sum().item()
+                correct = torch.eq(pred, y_qry).sum().item()
                 results[k] += correct / querysz
                 
 
         
-        
-        results = [ i.cpu().detach().numpy() for i in results]
+        if self.args.dataset == 'sine':
+            results = [ i.cpu().detach().numpy() for i in results]
         results = np.array(results)
         # results = np.array(results.cpu().detach().numpy()) / querysz
         # results = results / b
