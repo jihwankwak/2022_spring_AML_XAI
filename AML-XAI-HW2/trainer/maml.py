@@ -175,7 +175,7 @@ class Trainer(trainer.GenericTrainer):
         # The components in 'results' are as follows:
         # results[0]: results for pre-update model
         # results[1:]: results for the adapted model at each inner loop step
-        results = [0 for _ in range(self.inner_step + 1)]
+        results = [0 for _ in range(self.inner_step_test + 1)]
         
         ##########################################################################################
         
