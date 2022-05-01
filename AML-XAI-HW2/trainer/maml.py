@@ -216,7 +216,7 @@ class Trainer(trainer.GenericTrainer):
                 correct = torch.eq(pred, y_qry).sum().item()
                 results[1] += correct / querysz      
 
-        for k in range(2, self.inner_step+1):
+        for k in range(2, self.inner_step_test+1):
             logit = net(x_spt, vars=updated_w)
                 
             loss = self.loss(logit, y_spt)
